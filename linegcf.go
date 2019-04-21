@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"cloud.google.com/go/firestore"
 )
@@ -35,6 +36,7 @@ func init() {
 }
 
 var (
+	wg                sync.WaitGroup
 	lineChannelSecret string = os.Getenv("LINE_CHANNEL_SECRET")
 	req               struct {
 		Destination string `json:"destination"`
@@ -137,8 +139,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Type: %s", e.Message.Type)
 		}
 
+		wg.Add(1)
 		go writeMsg(e.Timestamp, e.ReplyToken, e.Source, e.Message)
 	}
+
+	wg.Wait()
 
 	fmt.Fprintf(w, "Ok")
 }
@@ -181,6 +186,8 @@ type FsMessage struct {
 
 func writeMsg(timestamp int64, replyToken string, source LineSource, msg LineMessage) {
 	log.Printf("writeMsg - timestamp:%d source:%v msg:%v", timestamp, source, msg)
+
+	defer wg.Done()
 
 	doc := client.Doc("Messages/" + msg.ID)
 	wr, err := doc.Create(ctx, FsMessage{
