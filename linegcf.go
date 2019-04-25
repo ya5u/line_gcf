@@ -82,6 +82,88 @@ type LineMessage struct {
 	}
 }
 
+// TextMessage Document in Firestore collection "Messages"
+type TextMessage struct {
+	Timestamp  int64  `firestore:"timestamp"`
+	ReplyToken string `firestore:"replyToken"`
+	SourceType string `firestore:"sourceType"`
+	UserID     string `firestore:"userID"`
+	GroupID    string `firestore:"groupID"`
+	RoomID     string `firestore:"roomID"`
+	Type       string `firestore:"type"`
+	Text       string `firestore:"text"`
+}
+
+// ImageMessage Document in Firestore collection "Messages"
+type ImageMessage struct {
+	Timestamp          int64  `firestore:"timestamp"`
+	ReplyToken         string `firestore:"replyToken"`
+	SourceType         string `firestore:"sourceType"`
+	UserID             string `firestore:"userID"`
+	GroupID            string `firestore:"groupID"`
+	RoomID             string `firestore:"roomID"`
+	Type               string `firestore:"type"`
+	ContentType        string `firestore:"contentType"`
+	OriginalContentURL string `firestore:"originalContentURL"`
+	PreviewImageURL    string `firestore:"previewImageURL"`
+}
+
+// VideoMessage Document in Firestore collection "Messages"
+type VideoMessage struct {
+	Timestamp          int64  `firestore:"timestamp"`
+	ReplyToken         string `firestore:"replyToken"`
+	SourceType         string `firestore:"sourceType"`
+	UserID             string `firestore:"userID"`
+	GroupID            string `firestore:"groupID"`
+	RoomID             string `firestore:"roomID"`
+	Type               string `firestore:"type"`
+	ContentType        string `firestore:"contentType"`
+	OriginalContentURL string `firestore:"originalContentURL"`
+	PreviewImageURL    string `firestore:"previewImageURL"`
+	Duration           int64  `firestore:"duration"`
+}
+
+// FileMessage Document in Firestore collection "Messages"
+type FileMessage struct {
+	Timestamp  int64  `firestore:"timestamp"`
+	ReplyToken string `firestore:"replyToken"`
+	SourceType string `firestore:"sourceType"`
+	UserID     string `firestore:"userID"`
+	GroupID    string `firestore:"groupID"`
+	RoomID     string `firestore:"roomID"`
+	Type       string `firestore:"type"`
+	FileName   string `firestore:"fileName"`
+	FileSize   int64  `firestore:"fileSize"`
+}
+
+// LocationMessage Document in Firestore collection "Messages"
+type LocationMessage struct {
+	Timestamp  int64   `firestore:"timestamp"`
+	ReplyToken string  `firestore:"replyToken"`
+	SourceType string  `firestore:"sourceType"`
+	UserID     string  `firestore:"userID"`
+	GroupID    string  `firestore:"groupID"`
+	RoomID     string  `firestore:"roomID"`
+	Type       string  `firestore:"type"`
+	Title      string  `firestore:"title"`
+	Address    string  `firestore:"address"`
+	Latitude   float64 `firestore:"latitude"`
+	Longitude  float64 `firestore:"longitude"`
+}
+
+// StickerMessage Document in Firestore collection "Messages"
+type StickerMessage struct {
+	Timestamp  int64  `firestore:"timestamp"`
+	ReplyToken string `firestore:"replyToken"`
+	SourceType string `firestore:"sourceType"`
+	UserID     string `firestore:"userID"`
+	GroupID    string `firestore:"groupID"`
+	RoomID     string `firestore:"roomID"`
+	Type       string `firestore:"type"`
+	PackageID  string `firestore:"packageID"`
+	StickerID  string `firestore:"stickerID"`
+}
+
 // Handler for Cloud Functions
 func Handler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Content-Type: %s", r.Header.Get("Content-Type"))
@@ -105,42 +187,92 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := req.Destination
 	events := req.Events
 
-	log.Printf("destination: %s", d)
-
 	for _, e := range events {
-		log.Printf("Timestamp: %d", e.Timestamp)
-		log.Printf("UserID: %s", e.Source.UserID)
-
+		wg.Add(1)
 		switch e.Message.Type {
 		case "text":
-			log.Printf("Text: %s", e.Message.Text)
+			go writeMsg(e.Message.ID, TextMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.Text,
+			})
+		case "image":
+			go writeMsg(e.Message.ID, ImageMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.ContentProvider.Type,
+				e.Message.ContentProvider.OriginalContentURL,
+				e.Message.ContentProvider.PreviewImageURL,
+			})
 		case "video":
 			fallthrough
 		case "audio":
-			log.Printf("Duration: %d", e.Message.Duration)
-			fallthrough
-		case "image":
-			log.Printf("ContetnProvider.Type: %s", e.Message.ContentProvider.Type)
+			go writeMsg(e.Message.ID, VideoMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.ContentProvider.Type,
+				e.Message.ContentProvider.OriginalContentURL,
+				e.Message.ContentProvider.PreviewImageURL,
+				e.Message.Duration,
+			})
 		case "file":
-			log.Printf("FileName: %s", e.Message.FileName)
-			log.Printf("FileSize: %d", e.Message.FileSize)
+			go writeMsg(e.Message.ID, FileMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.FileName,
+				e.Message.FileSize,
+			})
 		case "location":
-			log.Printf("Title: %s", e.Message.Title)
-			log.Printf("Address: %s", e.Message.Address)
-			log.Printf("Latitude: %f", e.Message.Latitude)
-			log.Printf("Longitude: %f", e.Message.Longitude)
+			go writeMsg(e.Message.ID, LocationMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.Title,
+				e.Message.Address,
+				e.Message.Latitude,
+				e.Message.Longitude,
+			})
 		case "sticker":
-			log.Printf("PackageID: %s", e.Message.PackageID)
-			log.Printf("StickerID: %s", e.Message.StickerID)
+			go writeMsg(e.Message.ID, StickerMessage{
+				e.Timestamp,
+				e.ReplyToken,
+				e.Source.Type,
+				e.Source.UserID,
+				e.Source.GroupID,
+				e.Source.RoomID,
+				e.Message.Type,
+				e.Message.PackageID,
+				e.Message.StickerID,
+			})
 		default:
 			log.Printf("Type: %s", e.Message.Type)
 		}
-
-		wg.Add(1)
-		go writeMsg(e.Timestamp, e.ReplyToken, e.Source, e.Message)
 	}
 
 	wg.Wait()
@@ -160,58 +292,13 @@ func verifySignature(signature string, body []byte) bool {
 	return hmac.Equal(decoded, hash.Sum(nil))
 }
 
-// FsMessage Document in Firestore collection "Messages"
-type FsMessage struct {
-	Timestamp          int64   `firestore:"timestamp"`
-	ReplyToken         string  `firestore:"replyToken"`
-	SourceType         string  `firestore:"sourceType"`
-	UserID             string  `firestore:"userID"`
-	GroupID            string  `firestore:"groupID"`
-	RoomID             string  `firestore:"roomID"`
-	Type               string  `firestore:"type"`
-	Text               string  `firestore:"text"`
-	PackageID          string  `firestore:"packageID"`
-	StickerID          string  `firestore:"stickerID"`
-	FileName           string  `firestore:"fileName"`
-	FileSize           int64   `firestore:"fileSize"`
-	Title              string  `firestore:"title"`
-	Address            string  `firestore:"address"`
-	Latitude           float64 `firestore:"latitude"`
-	Longitude          float64 `firestore:"longitude"`
-	Duration           int64   `firestore:"duration"`
-	ContentType        string  `firestore:"contentType"`
-	OriginalContentURL string  `firestore:"originalContentURL"`
-	PreviewImageURL    string  `firestore:"previewImageURL"`
-}
-
-func writeMsg(timestamp int64, replyToken string, source LineSource, msg LineMessage) {
-	log.Printf("writeMsg - timestamp:%d source:%v msg:%v", timestamp, source, msg)
+func writeMsg(id string, msg interface{}) {
+	log.Printf("writeMsg - id:%s msg:%v", id, msg)
 
 	defer wg.Done()
 
-	doc := client.Doc("Messages/" + msg.ID)
-	wr, err := doc.Create(ctx, FsMessage{
-		Timestamp:          timestamp,
-		ReplyToken:         replyToken,
-		SourceType:         source.Type,
-		UserID:             source.UserID,
-		GroupID:            source.GroupID,
-		RoomID:             source.RoomID,
-		Type:               msg.Type,
-		Text:               msg.Text,
-		PackageID:          msg.PackageID,
-		StickerID:          msg.StickerID,
-		FileName:           msg.FileName,
-		FileSize:           msg.FileSize,
-		Title:              msg.Title,
-		Address:            msg.Address,
-		Latitude:           msg.Latitude,
-		Longitude:          msg.Longitude,
-		Duration:           msg.Duration,
-		ContentType:        msg.ContentProvider.Type,
-		OriginalContentURL: msg.ContentProvider.OriginalContentURL,
-		PreviewImageURL:    msg.ContentProvider.PreviewImageURL,
-	})
+	doc := client.Doc("Messages/" + id)
+	wr, err := doc.Create(ctx, msg)
 	if err != nil {
 		log.Fatalf("writeMsg: %v", err)
 	}
